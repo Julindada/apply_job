@@ -12,9 +12,12 @@ dependencies = [
     "langdetect>=1.0.9",
     "langgraph>=1.1.6",
     "langgraph-cli[inmem]>=0.4.21",
-    "playwright>=1.49.0",
     "langgraph-checkpoint-sqlite>=3.0.3",
+    "typer>=0.24.1",
 ]
+
+[project.scripts]
+apply-job = "apply_job.cli:app"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
