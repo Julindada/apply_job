@@ -2,8 +2,9 @@
 Main graph: job-fetch pipeline
 
 Linear pipeline:
-  init → resolve_search_url → fetch_jobs_from_linkedin → filter_jobs
-    → review_pending_jobs (human-in-the-loop) → write_jobs_into_csv
+  init → resolve_search_url → fetch_jobs_from_linkedin → rule_filter
+    → llm_score → company_dedup → review_pending_jobs (human-in-the-loop)
+    → write_jobs_into_csv
 
 Required state inputs:
   country      — ISO country code, e.g. "DE". Determines the LinkedIn search URL.
@@ -23,7 +24,9 @@ from apply_job.nodes import (
     init_node,
     resolve_search_url_node,
     fetch_jobs_from_linkedin_node,
-    filter_jobs_node,
+    rule_filter_node,
+    llm_score_node,
+    company_dedup_node,
     review_pending_jobs_node,
     write_jobs_into_csv_node,
 )
@@ -38,15 +41,19 @@ _builder = StateGraph(AgentState)
 _builder.add_node("init",            init_node)
 _builder.add_node("resolve_url",     resolve_search_url_node)
 _builder.add_node("fetch_jobs",      fetch_jobs_from_linkedin_node)
-_builder.add_node("filter_jobs",     filter_jobs_node)
+_builder.add_node("rule_filter",     rule_filter_node)
+_builder.add_node("llm_score",       llm_score_node)
+_builder.add_node("company_dedup",   company_dedup_node)
 _builder.add_node("review_pending",  review_pending_jobs_node)
 _builder.add_node("write_csv",       write_jobs_into_csv_node)
 
 _builder.add_edge(START,             "init")
 _builder.add_edge("init",            "resolve_url")
 _builder.add_edge("resolve_url",     "fetch_jobs")
-_builder.add_edge("fetch_jobs",      "filter_jobs")
-_builder.add_edge("filter_jobs",     "review_pending")
+_builder.add_edge("fetch_jobs",      "rule_filter")
+_builder.add_edge("rule_filter",     "llm_score")
+_builder.add_edge("llm_score",       "company_dedup")
+_builder.add_edge("company_dedup",   "review_pending")
 _builder.add_edge("review_pending",  "write_csv")
 _builder.add_edge("write_csv",       END)
 

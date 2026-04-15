@@ -13,7 +13,7 @@
 ## 二、整体流程
 
 ```
-resolve_url → fetch_jobs → filter_jobs → review_pending → write_csv
+resolve_url → fetch_jobs → rule_filter → llm_score → company_dedup → review_pending → write_csv
 ```
 
 每个步骤对应 `src/apply_job/nodes/` 下的一个 LangGraph 节点，共享同一个 `AgentState`。
@@ -68,13 +68,10 @@ resolve_url → fetch_jobs → filter_jobs → review_pending → write_csv
 
 ---
 
-### 3. `filter_jobs` — 两阶段过滤 + LLM 评分
+### 3. `rule_filter` — 规则过滤（无 LLM）
 
-**文件**：`src/apply_job/nodes/filter_jobs.py`  
-**工具**：`src/apply_job/tools/filter_jobs.py`  
-**Prompt**：`src/apply_job/prompts/evaluate.py`
-
-#### Stage 1：规则过滤（无 LLM）
+**文件**：`src/apply_job/nodes/rule_filter.py`  
+**工具**：`src/apply_job/tools/filter_jobs.py`（内部 helper 被节点直接导入）
 
 | 过滤规则 | 说明 |
 |---------|------|
@@ -82,9 +79,14 @@ resolve_url → fetch_jobs → filter_jobs → review_pending → write_csv
 | 语言检测 | 排除德语 / 荷兰语 / 西班牙语 / 波兰语（使用 `langdetect`） |
 | 关键词排除 | 排除含 `frontend` / `front end` / `front-end` / `fullstack` / `full stack` / `full-stack` 的职位 |
 
-#### Stage 2：LLM 评分（Dashscope qwen3.6-plus）
+---
 
-将 Stage 1 通过的职位（每批最多 300 条）连同简历文本发给 LLM，按以下规则分类：
+### 4. `llm_score` — LLM 评分与分类
+
+**文件**：`src/apply_job/nodes/llm_score.py`  
+**Prompt**：`src/apply_job/prompts/evaluate.py`
+
+将 `rule_filter` 通过的职位（每批最多 300 条）连同简历文本发给 LLM（Dashscope qwen3.6-plus），按以下规则分类：
 
 | 优先级 | 条件 | 分类 |
 |--------|------|------|
@@ -109,7 +111,15 @@ LLM 输出字段（每条职位）：
 
 ---
 
-### 4. `review_pending` — 人工审核 pending 职位
+### 5. `company_dedup` — 公司去重
+
+**文件**：`src/apply_job/nodes/company_dedup.py`
+
+对 `filtered_jobs` 按 `companyName` 分组，同一公司只保留 `overall` 评分最高的那一条。其余重复的职位**直接丢弃**（不会加入 `unsuitable_jobs`）。
+
+---
+
+### 6. `review_pending` — 人工审核 pending 职位
 
 **文件**：`src/apply_job/nodes/review_pending_jobs.py`
 
@@ -122,7 +132,7 @@ Human-in-the-loop 节点。对每条 `pending` 职位，通过 `interrupt()` 暂
 
 ---
 
-### 5. `write_csv` — 写入 CSV
+### 7. `write_csv` — 写入 CSV
 
 **文件**：`src/apply_job/nodes/write_jobs_into_csv.py`  
 **工具**：`src/apply_job/tools/csv_ops.py`
@@ -151,8 +161,8 @@ excluded_files: list[str] # 输入（可选）：去重文件列表
 resume_path: str          # 输入：简历 PDF 路径
 
 raw_jobs: list[dict]        # fetch_jobs 写入
-filtered_jobs: list[dict]   # filter_jobs / review_pending 写入（suitable + pending 确认）
-unsuitable_jobs: list[dict] # filter_jobs / review_pending 写入
+filtered_jobs: list[dict]   # rule_filter / llm_score / company_dedup / review_pending 逐步写入
+unsuitable_jobs: list[dict] # llm_score / review_pending 写入
 csv_paths: list[str]        # write_csv 写入（追加语义）
 ```
 

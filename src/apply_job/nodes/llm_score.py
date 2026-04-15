@@ -1,10 +1,8 @@
 """
-Node: filter_jobs
+Node: llm_score
 
-Two-stage filtering pipeline:
-  Stage 1 — rule-based: dedup, language detection, keyword exclusion (fast, no LLM)
-  Stage 2 — LLM scoring: compare each job against the resume using the job-matcher
-             classification rules; keep only suitable / pending jobs.
+Second stage of the filtering pipeline — LLM scoring and classification against
+the user's resume. Jobs are classified as suitable, unsuitable, or pending.
 """
 
 import json
@@ -17,8 +15,6 @@ from pypdf import PdfReader
 from apply_job.config import settings
 from apply_job.prompts.evaluate import EVALUATE_JOBS_PROMPT
 from apply_job.state import AgentState
-from apply_job.tools.filter_jobs import filter_jobs
-
 
 # Maximum jobs sent to the LLM in a single call.
 # Scoring all jobs together keeps the rating scale consistent across the batch.
@@ -35,25 +31,13 @@ _SCORE_BATCH_SIZE = 300
 _MAX_DESC_CHARS = 3000
 
 
-def filter_jobs_node(state: AgentState) -> dict:
-    """LangGraph node: rule-based filter then LLM scoring against resume."""
+def llm_score_node(state: AgentState) -> dict:
+    """LangGraph node: LLM scoring and classification."""
 
-    # --- Stage 1: rule-based filter ---
-    # Derive default excluded file paths from settings.data_dir.
-    default_excluded = [
-        os.path.join(settings.data_dir, "finished_jobs.csv"),
-        os.path.join(settings.data_dir, "unsuitable.csv"),
-    ]
-    after_rules: list[dict] = filter_jobs.invoke({
-        "raw_jobs": state.get("raw_jobs", []),
-        "excluded_files": state.get("excluded_files") or default_excluded,
-    })
-
-    # Skip LLM call entirely if nothing survived the rule-based stage.
-    if not after_rules:
+    jobs = state.get("filtered_jobs", [])
+    if not jobs:
         return {"filtered_jobs": [], "unsuitable_jobs": []}
 
-    # --- Stage 2: LLM scoring ---
     resume_path = state.get("resume_path", "")
     resume_text = _read_resume(resume_path)
 
@@ -66,8 +50,8 @@ def filter_jobs_node(state: AgentState) -> dict:
 
     # Collect all scored results across batches into a flat list.
     scored: list[dict] = []
-    for i in range(0, len(after_rules), _SCORE_BATCH_SIZE):
-        batch = after_rules[i : i + _SCORE_BATCH_SIZE]
+    for i in range(0, len(jobs), _SCORE_BATCH_SIZE):
+        batch = jobs[i : i + _SCORE_BATCH_SIZE]
         scored.extend(_score_batch(llm, resume_text, batch))
 
     # Index scores by job ID for O(1) lookup during the merge pass below.
@@ -75,7 +59,7 @@ def filter_jobs_node(state: AgentState) -> dict:
 
     filtered_jobs = []
     unsuitable_jobs = []
-    for job in after_rules:
+    for job in jobs:
         score = score_map.get(job.get("id", ""))
         # Skip jobs the LLM failed to score (e.g. JSON parse error for that batch).
         if score is None:
