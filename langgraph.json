@@ -1,0 +1,8 @@
+{
+    "dependencies": [
+        "."
+    ],
+    "graphs": {
+        "main": "./src/apply_job/graph.py:graph"
+    }
+}
