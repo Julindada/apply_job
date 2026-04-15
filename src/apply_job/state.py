@@ -8,7 +8,6 @@ class AgentState(TypedDict):
     # --- Input ---
     country: str             # ISO country code, e.g. "DE". Determines the LinkedIn search URL.
     search_url: str          # Populated by resolve_search_url_node; do not set manually.
-    data_dir: str            # Single directory for all input and output files, e.g. "data"
     excluded_files: list[str]  # CSV files whose job IDs should be excluded
     resume_path: str         # Path to the resume PDF used for LLM scoring
 

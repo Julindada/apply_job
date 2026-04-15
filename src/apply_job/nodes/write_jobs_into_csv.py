@@ -10,6 +10,7 @@ Both files are read back as excluded_files at the start of the next run.
 
 import os
 
+from apply_job.config import settings
 from apply_job.state import AgentState
 from apply_job.tools.csv_ops import overwriting_csv
 
@@ -27,7 +28,7 @@ _UNSUITABLE_COLUMNS = [
 
 
 def write_jobs_into_csv_node(state: AgentState) -> dict:
-    data_dir = state.get("data_dir", "data")
+    data_dir = settings.data_dir
     suitable_jobs: list[dict] = state.get("filtered_jobs", [])
     unsuitable_jobs: list[dict] = state.get("unsuitable_jobs", [])
 

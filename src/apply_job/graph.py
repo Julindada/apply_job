@@ -7,15 +7,22 @@ Linear pipeline:
 
 Required state inputs:
   country      — ISO country code, e.g. "DE". Determines the LinkedIn search URL.
-  data_dir     — directory for all input/output files, e.g. "data"
   resume_path  — path to the resume PDF for LLM scoring
 
 Optional state inputs:
-  excluded_files — override the default [data_dir/suitable.csv, data_dir/unsuitable.csv]
+  excluded_files — override the default [DATA_DIR/suitable.csv, DATA_DIR/unsuitable.csv]
+
+Environment variables (see config.py):
+  DATA_DIR     — directory for all input/output files (default: "data")
 """
 
+import os
+import sqlite3
+
+from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import StateGraph, START, END
 
+from apply_job.config import settings
 from apply_job.nodes import (
     resolve_search_url_node,
     fetch_jobs_from_linkedin_node,
@@ -44,6 +51,13 @@ _builder.add_edge("filter_jobs",     "review_pending")
 _builder.add_edge("review_pending",  "write_csv")
 _builder.add_edge("write_csv",       END)
 
-# LangGraph API (Studio / Cloud) manages persistence automatically.
-# Do not pass a checkpointer here — the platform injects one at runtime.
-graph = _builder.compile()
+# ---------------------------------------------------------------------------
+# Persistence: SQLite checkpointer
+# ---------------------------------------------------------------------------
+
+os.makedirs(settings.data_dir, exist_ok=True)
+_conn = sqlite3.connect(
+    os.path.join(settings.data_dir, "checkpoints.db"),
+    check_same_thread=False,
+)
+graph = _builder.compile(checkpointer=SqliteSaver(_conn))

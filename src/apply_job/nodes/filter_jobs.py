@@ -19,6 +19,7 @@ from apply_job.prompts.evaluate import EVALUATE_JOBS_PROMPT
 from apply_job.state import AgentState
 from apply_job.tools.filter_jobs import filter_jobs
 
+
 # Maximum jobs sent to the LLM in a single call.
 # Scoring all jobs together keeps the rating scale consistent across the batch.
 #
@@ -38,11 +39,10 @@ def filter_jobs_node(state: AgentState) -> dict:
     """LangGraph node: rule-based filter then LLM scoring against resume."""
 
     # --- Stage 1: rule-based filter ---
-    data_dir = state.get("data_dir", "data")
-    # Derive default excluded file paths from data_dir so all I/O stays in one place.
+    # Derive default excluded file paths from settings.data_dir.
     default_excluded = [
-        os.path.join(data_dir, "finished_jobs.csv"),
-        os.path.join(data_dir, "unsuitable.csv"),
+        os.path.join(settings.data_dir, "finished_jobs.csv"),
+        os.path.join(settings.data_dir, "unsuitable.csv"),
     ]
     after_rules: list[dict] = filter_jobs.invoke({
         "raw_jobs": state.get("raw_jobs", []),
