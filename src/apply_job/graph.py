@@ -19,7 +19,6 @@ Environment variables (see config.py):
 import os
 import sqlite3
 
-from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import StateGraph, START, END
 
 from apply_job.config import settings
@@ -52,12 +51,21 @@ _builder.add_edge("review_pending",  "write_csv")
 _builder.add_edge("write_csv",       END)
 
 # ---------------------------------------------------------------------------
-# Persistence: SQLite checkpointer
+# Persistence: SQLite checkpointer (disabled for LangGraph API / Studio)
 # ---------------------------------------------------------------------------
 
-os.makedirs(settings.data_dir, exist_ok=True)
-_conn = sqlite3.connect(
-    os.path.join(settings.data_dir, "checkpoints.db"),
-    check_same_thread=False,
-)
-graph = _builder.compile(checkpointer=SqliteSaver(_conn))
+checkpointer = None
+if os.getenv("LANGGRAPH_DEV") or os.getenv("LANGGRAPH_API_URL"):
+    # LangGraph dev / API handles persistence automatically
+    pass
+else:
+    os.makedirs(settings.data_dir, exist_ok=True)
+    _conn = sqlite3.connect(
+        os.path.join(settings.data_dir, "checkpoints.db"),
+        check_same_thread=False,
+    )
+    from langgraph.checkpoint.sqlite import SqliteSaver
+
+    checkpointer = SqliteSaver(_conn)
+
+graph = _builder.compile(checkpointer=checkpointer)

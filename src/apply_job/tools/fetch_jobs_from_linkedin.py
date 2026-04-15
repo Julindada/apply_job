@@ -5,8 +5,6 @@ Calls the Apify LinkedIn Jobs Scraper actor and returns raw job dicts.
 Mirrors ApifyClient.fetchJobs() from the Kotlin implementation.
 """
 
-import os
-
 import httpx
 from langchain_core.tools import tool
 
@@ -39,7 +37,9 @@ def _call_apify(urls: list[str], split_country: str, count: int) -> list[dict]:
     Uses run-sync-get-dataset-items so the response arrives in a single HTTP
     call instead of requiring separate polling for the dataset.
     """
-    api_token = os.getenv("APIFY_API_TOKEN", "")
+    from apply_job.config import settings
+
+    api_token = settings.apify_token
     endpoint = (
         f"{_APIFY_BASE}/{_ACTOR_ID}"
         f"/run-sync-get-dataset-items?timeout={_TIMEOUT_SEC}"
