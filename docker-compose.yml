@@ -19,6 +19,7 @@ services:
       - APIFY_API_TOKEN=${APIFY_API_TOKEN}
       - DATA_DIR=${DATA_DIR:-/app/data}
       - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
+      - WATCHFILES_IGNORE_PATHS=/app/data
     volumes:
       - ~/docker_data:/app/data
       - ./src:/app/src:ro

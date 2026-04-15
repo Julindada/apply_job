@@ -36,12 +36,13 @@ def init_node(state: AgentState) -> dict:
             f"Missing required environment variable(s): {', '.join(missing)}"
         )
 
-    # 3. Validate resume_path exists
-    resume_path = state.get("resume_path", "")
-    if not resume_path or not os.path.exists(resume_path):
+    # 3. Validate resume_path exists; fall back to default if not provided
+    resume_path = state.get("resume_path") or settings.default_resume_path
+    if not os.path.exists(resume_path):
         raise FileNotFoundError(
             f"Resume file not found: '{resume_path}'. "
-            "Set --resume to a valid PDF path."
+            f"Place your resume PDF at {settings.default_resume_path} "
+            "or pass --resume <path>."
         )
 
     # 4. Archive suitable.csv → finished.csv, then clear suitable.csv
@@ -64,4 +65,4 @@ def init_node(state: AgentState) -> dict:
     # 5. Populate excluded_files so filter_jobs can deduplicate
     excluded_files = [finished_path, os.path.join(data_dir, "unsuitable.csv")]
 
-    return {"excluded_files": excluded_files}
+    return {"resume_path": resume_path, "excluded_files": excluded_files}
