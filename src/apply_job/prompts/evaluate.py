@@ -20,19 +20,24 @@ Score and classify each job using the rules below.
 2. JD requires more than 7 years of development experience → unsuitable
 3. JD requires frontend or fullstack technologies as PRIMARY stack
    (JavaScript, TypeScript, Node.js, React, Vue, Angular, CSS, HTML) → unsuitable
-4. Primary language is NOT JVM (Java/Kotlin/Scala/Groovy/Clojure) AND the JD does NOT
-   explicitly state that JVM experience is acceptable as an alternative → unsuitable
-5. JVM language appears as PRIMARY language in requirements OR company tech stack → suitable
-6. JD is vague or missing tech stack info — primary language cannot be determined → pending
+4. JD explicitly names a non-JVM language as the sole/primary language (e.g. "we use Python",
+   "primary language is Go", "strong Rust required") AND does NOT mention any JVM language
+   (Java/Kotlin/Scala) anywhere in requirements or tech stack → unsuitable
+5. Any JVM language (Java/Kotlin/Scala) appears ANYWHERE in the required
+   skills, preferred skills, or company tech stack — even alongside other languages → suitable
+6. JD contains zero language signals and tech stack cannot be determined at all → pending
 
 ## Additional notes
 - Scan ALL sections of the JD for language signals: requirements, company stack, "what we use".
-- Rule 4 examples — unsuitable: "primary language is Python", "we use Go", "strong Rust required".
-  Skip rule 4 if JD says "Python or Java", "Go preferred but JVM accepted", "polyglot team".
+- Rule 4 examples — unsuitable: "primary language is Python with no Java/Kotlin mention",
+  "we use Go exclusively". Skip rule 4 if Java/Kotlin appears anywhere in the JD.
+- Rule 5 examples — suitable: "Java or Python", "Kotlin preferred", "experience in Java is a plus",
+  "our stack includes Java/Spring", "polyglot team using Kotlin and Go".
 - "Fullstack" in job title or as primary requirement → unsuitable.
 - German listed as "a plus" or "nice to have" → do NOT disqualify.
 - Only disqualify for explicit "7+ years" or "more than 7 years". "5–7 years" is acceptable.
 - Mid-level (medior) positions are acceptable.
+- When in doubt between suitable and pending, choose suitable if any JVM language is visible.
 
 ## Output format
 Return a JSON array — one object per job, in the same order as the input.
