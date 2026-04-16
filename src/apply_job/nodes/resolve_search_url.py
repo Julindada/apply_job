@@ -32,7 +32,7 @@ _BASE_PARAMS = {
     "f_T": "25194,10738,23347,1660",           # Software/Backend job function IDs
     "f_TPR": "r604800",                        # Posted in the last 7 days
     "keywords": "Backend Java",
-    "sortBy": "R",                             # Sort by relevance
+    "sortBy": "DD",                            # Sort by date (most recent first)
 }
 
 _LINKEDIN_BASE = "https://www.linkedin.com/jobs/search/"
