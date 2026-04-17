@@ -12,7 +12,7 @@ import os
 
 from apply_job.config import settings
 from apply_job.state import AgentState
-from apply_job.tools.csv_ops import overwriting_csv
+from apply_job.tools.csv_ops import overwriting_csv, append_write_csv
 
 _SUITABLE_COLUMNS = [
     "id", "title", "companyName", "link", "descriptionText",
@@ -45,7 +45,7 @@ def write_jobs_into_csv_node(state: AgentState) -> dict:
 
     if unsuitable_jobs:
         path = os.path.join(data_dir, "unsuitable.csv")
-        overwriting_csv.invoke({
+        append_write_csv.invoke({
             "filepath": path,
             "rows": unsuitable_jobs,
             "fieldnames": _UNSUITABLE_COLUMNS,
