@@ -17,7 +17,7 @@ Score and classify each job using the rules below.
 
 ## Classification rules (apply in order, first match wins)
 1. JD requires German (Deutsch, German B2/C1/C2, Deutschkenntnisse, etc.) → unsuitable
-2. JD requires more than 7 years of development experience → unsuitable
+2. JD requires 7 or more years of development experience (e.g. "7+ years", "8+ years", "10+ years", "at least 7 years") → unsuitable
 3. JD requires frontend or fullstack technologies as PRIMARY stack
    (JavaScript, TypeScript, Node.js, React, Vue, Angular, CSS, HTML) → unsuitable
 4. JD explicitly names a non-JVM language as the sole/primary language (e.g. "we use Python",
@@ -35,7 +35,7 @@ Score and classify each job using the rules below.
   "our stack includes Java/Spring", "polyglot team using Kotlin and Go".
 - "Fullstack" in job title or as primary requirement → unsuitable.
 - German listed as "a plus" or "nice to have" → do NOT disqualify.
-- Only disqualify for explicit "7+ years" or "more than 7 years". "5–7 years" is acceptable.
+- Disqualify for any explicit threshold ≥ 7 years: "7+ years", "8+ years", "10+ years", "at least 7 years", etc. "5–6 years" is acceptable.
 - Mid-level (medior) positions are acceptable.
 - When in doubt between suitable and pending, choose suitable if any JVM language is visible.
 

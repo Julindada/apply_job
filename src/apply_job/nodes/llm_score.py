@@ -28,7 +28,7 @@ _SCORE_BATCH_SIZE = 300
 
 # Maximum characters of descriptionText forwarded to the LLM per job.
 # Truncating avoids hitting token limits while preserving enough signal for classification.
-_MAX_DESC_CHARS = 3000
+_MAX_DESC_CHARS = 6000
 
 
 def llm_score_node(state: AgentState) -> dict:
