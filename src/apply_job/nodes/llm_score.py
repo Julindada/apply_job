@@ -44,7 +44,7 @@ def llm_score_node(state: AgentState) -> dict:
     llm = ChatOpenAI(
         model=settings.model,
         api_key=settings.api_key,
-        base_url="https://dashscope-us.aliyuncs.com/compatible-mode/v1",
+        base_url=settings.llm_base_url,
         temperature=0,
     )
 

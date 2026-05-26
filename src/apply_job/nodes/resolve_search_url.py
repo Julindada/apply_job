@@ -30,7 +30,8 @@ _BASE_PARAMS = {
     "f_E": "2,4",                              # Entry level + Mid-Senior
     "f_JT": "F",                               # Full-time only
     "f_T": "25194,10738,23347,1660",           # Software/Backend job function IDs
-    "f_TPR": "r604800",                        # Posted in the last 7 days
+    # "f_TPR": "r604800",                        # Posted in the last 7 days
+    "f_TPR": "r1814400",                         # Posted in the last 3 weeks
     "keywords": "Backend Java",
     "sortBy": "DD",                            # Sort by date (most recent first)
 }
