@@ -11,7 +11,6 @@ import os
 import uuid
 
 import typer
-from langgraph.errors import GraphInterrupt
 from langgraph.types import Command
 
 from apply_job.config import settings
@@ -39,13 +38,14 @@ def run(
     payload = {"country": country, "resume_path": resume_path}
 
     while True:
-        try:
-            result = graph.invoke(payload, config)
+        result = graph.invoke(payload, config)
+        interrupted = result.get("__interrupt__")
+        if interrupted:
+            payload = _handle_interrupt(interrupted)
+        else:
             csv_paths = result.get("csv_paths") or []
             typer.echo(f"\nDone! CSV written to: {', '.join(csv_paths) or 'none'}")
             break
-        except GraphInterrupt as exc:
-            payload = _handle_interrupt(exc)
 
 
 @app.command()
@@ -62,14 +62,18 @@ def apply(
 def _assert_chrome_reachable() -> None:
     import httpx
 
+    from apply_job.nodes.apply._shared import resolve_cdp_url
+
+    url = resolve_cdp_url(settings.cdp_url)
     try:
-        httpx.get(f"{settings.cdp_url}/json/version", timeout=3).raise_for_status()
+        httpx.get(f"{url}/json/version", timeout=3).raise_for_status()
     except Exception:
         typer.echo(
             f"\nError: cannot connect to Chrome at {settings.cdp_url}\n\n"
             "Start Chrome on your Mac with:\n\n"
             "  /Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome"
-            " --remote-debugging-port=9222 --no-first-run\n",
+            " --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug"
+            " --remote-allow-origins='*' --no-first-run\n",
             err=True,
         )
         raise SystemExit(1)
@@ -90,17 +94,18 @@ async def _apply_loop(csv_path: str, resume_path: str) -> None:
         payload: dict | object = {"csv_path": csv_path, "resume_path": resume_path}
 
         while True:
-            try:
-                await graph.ainvoke(payload, config)
+            result = await graph.ainvoke(payload, config)
+            interrupted = result.get("__interrupt__")
+            if interrupted:
+                payload = await _handle_apply_interrupt(interrupted)
+            else:
                 typer.echo("\nAll jobs processed.")
                 return
-            except GraphInterrupt as exc:
-                payload = _handle_apply_interrupt(exc)
 
 
-def _handle_apply_interrupt(exc: GraphInterrupt) -> Command:
+async def _handle_apply_interrupt(interrupts: list) -> Command:
     decision = "continue"
-    for iv in exc.interrupts:
+    for iv in interrupts:
         v = iv.value
         idx = v.get("idx", 0)
         total = v.get("total", 0)
@@ -110,14 +115,17 @@ def _handle_apply_interrupt(exc: GraphInterrupt) -> Command:
         typer.echo(f"{'─' * 60}")
         typer.echo("  Fill in your basic info, then press Enter.")
         typer.echo("  Type  s + Enter  to skip this job.")
-        decision = typer.prompt("  > ", default="").strip().lower() or "continue"
+        # Run blocking stdin read in a thread so the event loop stays free
+        # to complete any pending async generator cleanup.
+        raw = await asyncio.to_thread(input, "  > ")
+        decision = raw.strip().lower() or "continue"
     return Command(resume=decision)
 
 
-def _handle_interrupt(exc: GraphInterrupt) -> Command:
+def _handle_interrupt(interrupts: list) -> Command:
     """Print job info for each interrupted job and collect user decision."""
     decision = "u"
-    for interrupt in exc.interrupts:
+    for interrupt in interrupts:
         v = interrupt.value
         typer.echo("\n" + "─" * 56)
         typer.echo(f"  {v.get('title')} @ {v.get('companyName')}")

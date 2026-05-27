@@ -17,5 +17,12 @@ class Settings:
     temperature: float = 0.0
     max_retries: int = 3
 
+    def __post_init__(self) -> None:
+        # OpenAI-compatible clients expect base_url to end with /v1
+        if self.apply_base_url:
+            url = self.apply_base_url.rstrip("/")
+            if not url.endswith("/v1"):
+                self.apply_base_url = url + "/v1"
+
 
 settings = Settings()
