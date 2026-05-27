@@ -3,6 +3,7 @@
         "."
     ],
     "graphs": {
-        "main": "./src/apply_job/graph.py:graph"
+        "main": "./src/apply_job/graph.py:graph",
+        "apply": "./src/apply_job/apply_graph.py:apply_graph"
     }
 }

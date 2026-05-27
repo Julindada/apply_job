@@ -54,11 +54,14 @@ def apply(
     resume_path: str = typer.Option(None, "--resume", "-r", help="Path to resume PDF"),
 ):
     """Open job application URLs one by one and let Agent complete each form."""
-    from apply_job.apply import run_apply_loop
+    from apply_job.apply_graph import apply_graph
 
     resolved_csv = csv_path or os.path.join(settings.data_dir, "suitable.csv")
     resolved_resume = resume_path or settings.default_resume_path
-    asyncio.run(run_apply_loop(resolved_csv, resolved_resume))
+    asyncio.run(apply_graph.ainvoke({
+        "csv_path": resolved_csv,
+        "resume_path": resolved_resume,
+    }))
 
 
 def _handle_interrupt(exc: GraphInterrupt) -> Command:
