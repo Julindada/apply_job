@@ -1,11 +1,11 @@
 from contextlib import asynccontextmanager
 
-from langchain_openai import ChatOpenAI
-
 from apply_job.config import settings
 
 
-def make_llm() -> ChatOpenAI:
+def make_llm():
+    from browser_use.llm.openai.chat import ChatOpenAI
+
     return ChatOpenAI(
         model=settings.apply_model,
         api_key=settings.apply_api_key,
