@@ -6,7 +6,7 @@
 - **LLM**：Alibaba Dashscope（模型 `qwen3.6-plus`，通过 OpenAI 兼容接口调用）
 - **职位抓取**：Apify LinkedIn Jobs Scraper actor
 - **浏览器自动化**：browser-use（底层 Playwright，通过 CDP 连接宿主机 Chrome）
-- **项目入口**：`src/apply_job/graph.py`（发现流水线）、`src/apply_job/apply.py`（投递循环）
+- **项目入口**：`src/apply_job/graph.py`（发现流水线）、`src/apply_job/apply_graph.py`（投递流水线）
 - **运行方式**：Docker 容器；投递时用 `docker exec -it` 交互
 
 ---
@@ -141,24 +141,31 @@ Human-in-the-loop 节点。对每条 `pending` 职位，通过 `interrupt()` 暂
 
 ## 四、投递循环模块详解
 
-### 1. `apply.py` — 投递主循环 ✅ 已实现（待测试）
+### 1. `nodes/apply_jobs.py` — 投递节点 ✅ 已实现（待测试）
 
-**文件**：`src/apply_job/apply.py`  
+**文件**：`src/apply_job/nodes/apply_jobs.py`  
+**图**：`src/apply_job/apply_graph.py`（单节点图，注册为 `"apply"`）  
 **入口**：`apply-job apply`（`docker exec -it apply-job apply-job apply`）
 
-核心逻辑：
+`ApplyState`（定义于同文件）：
 
 ```python
-browser = Browser(config=BrowserConfig(cdp_url=settings.cdp_url))
-context = await browser.new_context()
-
-for job in jobs:
-    # 1. 新标签打开链接
-    # 2. 等待用户按 Enter
-    # 3. 生成 cover letter PDF
-    # 4. Agent 填写必填字段 + 上传 + 提交
-    # 5. 新标签打开下一个链接
+class ApplyState(TypedDict):
+    csv_path: str
+    resume_path: str
 ```
+
+节点逻辑（每个职位循环一次，使用 `input()` 等待用户，无需 LangGraph interrupt）：
+
+```
+for job in jobs:
+    1. _browser_session() → Agent 新标签打开链接
+    2. input() 等待用户填写基本信息
+    3. generate_cover_letter_pdf()
+    4. _browser_session() → Agent 填必填字段 + 上传 CL + 提交 + 开下一个链接
+```
+
+两次 browser session 分开：第一次仅导航，第二次填写提交。Chrome 保持运行，标签页在两次 session 之间保持打开。
 
 CLI 参数：
 
@@ -174,8 +181,7 @@ CLI 参数：
 ```
 
 **待开发**：
-- [ ] 投递结果写入 `applied.csv`（成功 / 失败 / 跳过）
-- [ ] CDP 连接失败时的错误提示
+- [ ] CDP 连接失败时的明确错误提示
 - [ ] 提交后验证是否出现成功确认信息
 
 ---
@@ -194,22 +200,6 @@ CLI 参数：
 - [ ] Cover letter 质量评估 / 缓存（同一职位不重复生成）
 
 ---
-
-### 3. `applied.csv` — 投递结果记录 ⬜ 待开发
-
-**文件**：`src/apply_job/tools/record_apply_result.py`（待新建）
-
-每次投递完成后追加一条记录：
-
-| 列 | 说明 |
-|----|------|
-| `id` | 职位 ID |
-| `title` | 职位名称 |
-| `companyName` | 公司名称 |
-| `link` | 投递链接 |
-| `applied_at` | 投递时间（ISO 8601） |
-| `status` | `applied` / `skipped` / `error` |
-| `note` | Agent 的备注（如警告信息） |
 
 ---
 
@@ -252,5 +242,4 @@ csv_paths: list[str]        # write_csv 写入
 | `suitable.csv` | 发现流水线输出，投递循环输入 | `write_csv` 节点（覆盖写） |
 | `unsuitable.csv` | 不合适职位存档，下次去重用 | `write_csv` 节点（追加写） |
 | `rejection_companies_sorted.txt` | 拒绝公司名单，手动维护 | 用户 |
-| `applied.csv` | 投递结果记录 | 待开发 |
 | `resume.pdf` | 简历，LLM 评分和 cover letter 生成使用 | 用户 |
