@@ -15,7 +15,7 @@ def load_jobs_node(state: ApplyState) -> dict:
     if not jobs:
         logging.warning("No jobs with links found in %s", state["csv_path"])
     else:
-        print(f"\nLoaded {len(jobs)} jobs. Chrome should be running at {settings.cdp_url}")
+        print(f"\nLoaded {len(jobs)} jobs.")
     return {
         "jobs": jobs,
         "resume_text": resume_text,

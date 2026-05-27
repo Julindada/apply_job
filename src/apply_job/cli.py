@@ -59,10 +59,28 @@ def apply(
     asyncio.run(_apply_loop(resolved_csv, resolved_resume))
 
 
+def _assert_chrome_reachable() -> None:
+    import httpx
+
+    try:
+        httpx.get(f"{settings.cdp_url}/json/version", timeout=3).raise_for_status()
+    except Exception:
+        typer.echo(
+            f"\nError: cannot connect to Chrome at {settings.cdp_url}\n\n"
+            "Start Chrome on your Mac with:\n\n"
+            "  /Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome"
+            " --remote-debugging-port=9222 --no-first-run\n",
+            err=True,
+        )
+        raise SystemExit(1)
+
+
 async def _apply_loop(csv_path: str, resume_path: str) -> None:
     from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
     from apply_job.apply_graph import build_apply_graph
+
+    _assert_chrome_reachable()
 
     db_path = os.path.join(settings.data_dir, "apply_checkpoints.db")
     async with AsyncSqliteSaver.from_conn_string(db_path) as checkpointer:
