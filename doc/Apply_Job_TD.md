@@ -1,40 +1,49 @@
-# Apply Job
+# Apply Job — Technical Design
 
 ## 一、技术栈
 
 - **语言 / 框架**：Python 3.13 + LangGraph
 - **LLM**：Alibaba Dashscope（模型 `qwen3.6-plus`，通过 OpenAI 兼容接口调用）
 - **职位抓取**：Apify LinkedIn Jobs Scraper actor
-- **项目入口**：`src/apply_job/graph.py`，LangGraph 图对象 `graph`
-- **运行方式**：LangGraph API（Studio / Cloud），通过 `langgraph.json` 注册
+- **浏览器自动化**：browser-use（底层 Playwright，通过 CDP 连接宿主机 Chrome）
+- **项目入口**：`src/apply_job/graph.py`（发现流水线）、`src/apply_job/apply.py`（投递循环）
+- **运行方式**：Docker 容器；投递时用 `docker exec -it` 交互
 
 ---
 
 ## 二、整体流程
 
+### 2.1 发现流水线（自动，无人值守）
+
 ```
 resolve_url → fetch_jobs → rule_filter → llm_score → company_dedup → review_pending → write_csv
 ```
 
-每个步骤对应 `src/apply_job/nodes/` 下的一个 LangGraph 节点，共享同一个 `AgentState`。
+每个步骤对应 `src/apply_job/nodes/` 下的一个 LangGraph 节点，共享同一个 `AgentState`。运行结果写入 `suitable.csv`，作为投递循环的输入。
 
-### 必填输入（调用图时传入 state）
+### 2.2 投递循环（半自动，人机协作）
 
-| 字段 | 说明 |
-|------|------|
-| `country` | ISO 国家代码，如 `"DE"`，用于生成 LinkedIn 搜索 URL |
-| `data_dir` | 数据目录，如 `"data"`，所有 CSV 均写入此目录 |
-| `resume_path` | 简历 PDF 路径，用于 LLM 评分 |
-
-### 可选输入
-
-| 字段 | 说明 |
-|------|------|
-| `excluded_files` | 覆盖默认的去重文件列表（默认为 `[data_dir/finished_jobs.csv, data_dir/unsuitable.csv]`） |
+```
+读取 suitable.csv
+      ↓
+Agent 新标签打开投递链接（Chrome CDP）
+      ↓
+用户手动填写基本信息
+      ↓
+用户按 Enter 触发 Agent
+      ↓
+LLM 生成 cover letter → 保存为临时 PDF
+      ↓
+Agent 填写剩余必填字段 / 上传 cover letter / 点击提交
+      ↓
+Agent 新标签打开下一个链接
+      ↓
+写入 applied.csv（记录投递结果）        ← 待开发
+```
 
 ---
 
-## 三、节点详解
+## 三、发现流水线节点详解
 
 ### 1. `resolve_url` — 生成 LinkedIn 搜索 URL
 
@@ -48,8 +57,8 @@ resolve_url → fetch_jobs → rule_filter → llm_score → company_dedup → r
 - `keywords`：`Backend Java`
 - `f_E`：`2,4`（Entry level + Mid-Senior）
 - `f_JT`：`F`（Full-time）
-- `f_TPR`：`r604800`（最近 7 天发布）
-- `sortBy`：`R`（按相关性排序）
+- `f_TPR`：`r1814400`（最近 3 周发布）
+- `sortBy`：`DD`（按日期排序）
 
 ---
 
@@ -60,24 +69,26 @@ resolve_url → fetch_jobs → rule_filter → llm_score → company_dedup → r
 
 调用 Apify actor `curious_coder~linkedin-jobs-scraper`，一次抓取最多 300 条职位，写入 `state.raw_jobs`（`list[dict]`）。
 
-关键 API 参数：
-- `count`：300
-- `splitByLocation`：false
-- `splitCountry`：ISO 国家代码
-- HTTP 超时：300 秒（与 Apify 同步运行限制一致）
-
 ---
 
 ### 3. `rule_filter` — 规则过滤（无 LLM）
 
 **文件**：`src/apply_job/nodes/rule_filter.py`  
-**工具**：`src/apply_job/tools/filter_jobs.py`（内部 helper 被节点直接导入）
+**工具**：`src/apply_job/tools/filter_jobs.py`
 
 | 过滤规则 | 说明 |
 |---------|------|
 | 去重 | 读取 `excluded_files` 中的 job ID，跳过已处理的职位 |
+| 拒绝公司名单 | 读取 `data_dir/rejection_companies_sorted.txt`，按双向子串匹配过滤（大小写不敏感，去除法律后缀） |
 | 语言检测 | 排除德语 / 荷兰语 / 西班牙语 / 波兰语（使用 `langdetect`） |
-| 关键词排除 | 排除含 `frontend` / `front end` / `front-end` / `fullstack` / `full stack` / `full-stack` 的职位 |
+| 关键词排除 | 排除含 `frontend` / `fullstack` 等关键词的职位 |
+
+**拒绝公司名单格式**（`rejection_companies_sorted.txt`）：
+```
+# 格式：YYYY-MM-DD  公司名
+2026-01-06  Delivery Hero
+2026-03-23  Canva
+```
 
 ---
 
@@ -86,7 +97,7 @@ resolve_url → fetch_jobs → rule_filter → llm_score → company_dedup → r
 **文件**：`src/apply_job/nodes/llm_score.py`  
 **Prompt**：`src/apply_job/prompts/evaluate.py`
 
-将 `rule_filter` 通过的职位（每批最多 300 条）连同简历文本发给 LLM（Dashscope qwen3.6-plus），按以下规则分类：
+将过滤后的职位（每批最多 300 条）连同简历文本发给 LLM，按以下规则分类：
 
 | 优先级 | 条件 | 分类 |
 |--------|------|------|
@@ -97,17 +108,7 @@ resolve_url → fetch_jobs → rule_filter → llm_score → company_dedup → r
 | 5 | JVM 语言为主要语言 | suitable |
 | 6 | 技术栈模糊，无法判断 | pending |
 
-LLM 输出字段（每条职位）：
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `tech_stack` | 0–10 | 技术栈匹配度 |
-| `experience_level` | 0–10 | 经验要求匹配度 |
-| `language_requirements` | 0–10 | 语言要求匹配度 |
-| `domain_fit` | 0–10 | 领域契合度 |
-| `overall` | 0–10 | 综合评分 |
-| `classification` | string | `suitable` / `unsuitable` / `pending` |
-| `summary` | string | 中文两句总结，说明主语言和分类原因 |
+LLM 输出字段：`tech_stack` / `experience_level` / `language_requirements` / `domain_fit` / `overall`（均 0–10）、`classification`、`summary`
 
 ---
 
@@ -115,71 +116,141 @@ LLM 输出字段（每条职位）：
 
 **文件**：`src/apply_job/nodes/company_dedup.py`
 
-对 `filtered_jobs` 按 `companyName` 分组，同一公司只保留 `overall` 评分最高的那一条。其余重复的职位**直接丢弃**（不会加入 `unsuitable_jobs`）。
+对 `filtered_jobs` 按 `companyName` 分组，同一公司只保留 `overall` 最高的职位，其余丢弃。
 
 ---
 
-### 6. `review_pending` — 人工审核 pending 职位
+### 6. `review_pending` — 人工审核
 
 **文件**：`src/apply_job/nodes/review_pending_jobs.py`
 
-Human-in-the-loop 节点。对每条 `pending` 职位，通过 `interrupt()` 暂停图执行，展示职位信息，等待用户输入：
-
-- `s` / `suitable` / `yes` / `y` → 标记为 suitable
-- 其他 → 标记为 unsuitable
-
-`suitable` 职位直接透传，无需人工确认。
+Human-in-the-loop 节点。对每条 `pending` 职位，通过 `interrupt()` 暂停图执行，等待用户输入 `s`（suitable）或其他（unsuitable）。
 
 ---
 
 ### 7. `write_csv` — 写入 CSV
 
-**文件**：`src/apply_job/nodes/write_jobs_into_csv.py`  
-**工具**：`src/apply_job/tools/csv_ops.py`
+**文件**：`src/apply_job/nodes/write_jobs_into_csv.py`
 
-| 输出文件 | 来源 | 说明 |
-|---------|------|------|
-| `data_dir/suitable.csv` | `filtered_jobs` | suitable 职位（人工确认后的 pending 也在此） |
-| `data_dir/unsuitable.csv` | `unsuitable_jobs` | LLM 或人工判定为 unsuitable 的职位 |
-
-两个文件均写入以下列：  
-`id, title, companyName, link, descriptionText, tech_stack, experience_level, language_requirements, domain_fit, overall, classification, summary`
-
-下次运行时，这两个文件作为 `excluded_files` 传入，用于去重。
+| 输出文件 | 内容 |
+|---------|------|
+| `data_dir/suitable.csv` | suitable 职位（含人工确认的 pending） |
+| `data_dir/unsuitable.csv` | 不适合的职位（追加写入） |
 
 ---
 
-## 四、State 结构
+## 四、投递循环模块详解
+
+### 1. `apply.py` — 投递主循环 ✅ 已实现（待测试）
+
+**文件**：`src/apply_job/apply.py`  
+**入口**：`apply-job apply`（`docker exec -it apply-job apply-job apply`）
+
+核心逻辑：
+
+```python
+browser = Browser(config=BrowserConfig(cdp_url=settings.cdp_url))
+context = await browser.new_context()
+
+for job in jobs:
+    # 1. 新标签打开链接
+    # 2. 等待用户按 Enter
+    # 3. 生成 cover letter PDF
+    # 4. Agent 填写必填字段 + 上传 + 提交
+    # 5. 新标签打开下一个链接
+```
+
+CLI 参数：
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `--csv` | 职位 CSV 文件路径 | `data_dir/suitable.csv` |
+| `--resume` | 简历 PDF 路径 | `settings.default_resume_path` |
+
+宿主机 Chrome 启动方式：
+```bash
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+  --remote-debugging-port=9222 --no-first-run
+```
+
+**待开发**：
+- [ ] 投递结果写入 `applied.csv`（成功 / 失败 / 跳过）
+- [ ] CDP 连接失败时的错误提示
+- [ ] 提交后验证是否出现成功确认信息
+
+---
+
+### 2. `tools/cover_letter.py` — Cover Letter 生成 ✅ 已实现（待测试）
+
+**文件**：`src/apply_job/tools/cover_letter.py`
+
+流程：
+1. 用 LLM（`temperature=0.7`）根据职位描述 + 简历生成 3–4 段英文 cover letter
+2. 用 `fpdf2` 渲染为 PDF（Helvetica 字体，Latin-1 编码）
+3. 保存为临时文件，Agent 上传后由调用方删除
+
+**待开发**：
+- [ ] 支持 Unicode 字符（中文简历内容中的特殊字符）
+- [ ] Cover letter 质量评估 / 缓存（同一职位不重复生成）
+
+---
+
+### 3. `applied.csv` — 投递结果记录 ⬜ 待开发
+
+**文件**：`src/apply_job/tools/record_apply_result.py`（待新建）
+
+每次投递完成后追加一条记录：
+
+| 列 | 说明 |
+|----|------|
+| `id` | 职位 ID |
+| `title` | 职位名称 |
+| `companyName` | 公司名称 |
+| `link` | 投递链接 |
+| `applied_at` | 投递时间（ISO 8601） |
+| `status` | `applied` / `skipped` / `error` |
+| `note` | Agent 的备注（如警告信息） |
+
+---
+
+## 五、State 结构（发现流水线）
 
 定义于 `src/apply_job/state.py`（`AgentState`）：
 
 ```python
 country: str              # 输入：ISO 国家代码
 search_url: str           # resolve_url 写入
-data_dir: str             # 输入：数据目录
 excluded_files: list[str] # 输入（可选）：去重文件列表
 resume_path: str          # 输入：简历 PDF 路径
 
 raw_jobs: list[dict]        # fetch_jobs 写入
-filtered_jobs: list[dict]   # rule_filter / llm_score / company_dedup / review_pending 逐步写入
+filtered_jobs: list[dict]   # rule_filter / llm_score / company_dedup 逐步写入
 unsuitable_jobs: list[dict] # llm_score / review_pending 写入
-csv_paths: list[str]        # write_csv 写入（追加语义）
+csv_paths: list[str]        # write_csv 写入
 ```
 
 ---
 
-## 五、配置
+## 六、配置
 
 | 环境变量 | 说明 | 默认值 |
 |---------|------|--------|
 | `DASHSCOPE_V2_API_KEY` | Dashscope API Key | — |
 | `APIFY_API_TOKEN` | Apify API Token | — |
 | `LLM_MODEL` | LLM 模型名 | `qwen3.6-plus` |
+| `LLM_BASE_URL` | LLM API 地址 | `https://dashscope-us.aliyuncs.com/compatible-mode/v1` |
+| `CDP_URL` | Chrome DevTools Protocol 地址 | `http://host.docker.internal:9222` |
+| `DATA_DIR` | 数据目录（容器内） | `/app/data` |
+| `DEFAULT_RESUME_PATH` | 默认简历路径 | `/app/data/resume.pdf` |
 
 ---
 
-## 六、下游步骤
+## 七、数据文件
 
-### 匹配 / 投递（Claude Code Skills）
-
-**job-applier.skill**：读取 `suitable.csv`，打开投递链接，自动填写申请表单
+| 文件 | 用途 | 写入方 |
+|------|------|--------|
+| `suitable.csv` | 发现流水线输出，投递循环输入 | `write_csv` 节点（覆盖写） |
+| `unsuitable.csv` | 不合适职位存档，下次去重用 | `write_csv` 节点（追加写） |
+| `rejection_companies_sorted.txt` | 拒绝公司名单，手动维护 | 用户 |
+| `applied.csv` | 投递结果记录 | 待开发 |
+| `resume.pdf` | 简历，LLM 评分和 cover letter 生成使用 | 用户 |
