@@ -54,25 +54,30 @@ def apply(
     resume_path: str = typer.Option(None, "--resume", "-r", help="Path to resume PDF"),
 ):
     """Open job application URLs one by one and let Agent complete each form."""
-    from apply_job.apply_graph import apply_graph
-
     resolved_csv = csv_path or os.path.join(settings.data_dir, "suitable.csv")
     resolved_resume = resume_path or settings.default_resume_path
-    asyncio.run(_apply_loop(apply_graph, resolved_csv, resolved_resume))
+    asyncio.run(_apply_loop(resolved_csv, resolved_resume))
 
 
-async def _apply_loop(graph, csv_path: str, resume_path: str) -> None:
-    thread_id = str(uuid.uuid4())
-    config = {"configurable": {"thread_id": thread_id}}
-    payload: dict | object = {"csv_path": csv_path, "resume_path": resume_path}
+async def _apply_loop(csv_path: str, resume_path: str) -> None:
+    from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-    while True:
-        try:
-            await graph.ainvoke(payload, config)
-            typer.echo("\nAll jobs processed.")
-            return
-        except GraphInterrupt as exc:
-            payload = _handle_apply_interrupt(exc)
+    from apply_job.apply_graph import build_apply_graph
+
+    db_path = os.path.join(settings.data_dir, "apply_checkpoints.db")
+    async with AsyncSqliteSaver.from_conn_string(db_path) as checkpointer:
+        graph = build_apply_graph(checkpointer)
+        thread_id = str(uuid.uuid4())
+        config = {"configurable": {"thread_id": thread_id}}
+        payload: dict | object = {"csv_path": csv_path, "resume_path": resume_path}
+
+        while True:
+            try:
+                await graph.ainvoke(payload, config)
+                typer.echo("\nAll jobs processed.")
+                return
+            except GraphInterrupt as exc:
+                payload = _handle_apply_interrupt(exc)
 
 
 def _handle_apply_interrupt(exc: GraphInterrupt) -> Command:
