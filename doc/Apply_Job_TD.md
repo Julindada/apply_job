@@ -250,7 +250,8 @@ csv_paths: list[str]        # write_csv 写入
 |---------|------|--------|
 | `DASHSCOPE_V2_API_KEY` | Dashscope API Key | — |
 | `APIFY_API_TOKEN` | Apify API Token | — |
-| `LLM_MODEL` | LLM 模型名 | `qwen3.6-plus` |
+| `LLM_MODEL` | JD 评分 / 发现流水线模型 | `qwen3.6-plus` |
+| `APPLY_LLM_MODEL` | Apply 流水线模型（browser-use Agent + cover letter）| 同 `LLM_MODEL` |
 | `LLM_BASE_URL` | LLM API 地址 | `https://dashscope-us.aliyuncs.com/compatible-mode/v1` |
 | `CDP_URL` | Chrome DevTools Protocol 地址 | `http://host.docker.internal:9222` |
 | `DATA_DIR` | 数据目录（容器内） | `/app/data` |

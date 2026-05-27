@@ -39,7 +39,7 @@ def generate_cover_letter_pdf(job: dict, resume_text: str) -> str:
     deleting it after use.
     """
     llm = ChatOpenAI(
-        model=settings.model,
+        model=settings.apply_model,
         api_key=settings.api_key,
         base_url=settings.llm_base_url,
         temperature=0.7,

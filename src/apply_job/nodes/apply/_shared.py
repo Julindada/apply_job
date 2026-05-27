@@ -7,7 +7,7 @@ from apply_job.config import settings
 
 def make_llm() -> ChatOpenAI:
     return ChatOpenAI(
-        model=settings.model,
+        model=settings.apply_model,
         api_key=settings.api_key,
         base_url=settings.llm_base_url,
         temperature=0,
