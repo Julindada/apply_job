@@ -140,11 +140,21 @@ async def browser_session():
 
     Resolves the CDP hostname to an IP so Chrome accepts the Host header.
     keep_alive=True prevents Agent.close() from killing Chrome between steps.
+    Explicitly stops the session on exit to cancel background tasks and avoid
+    'Task was destroyed but it is pending!' warnings from asyncio GC.
     """
+    import asyncio
+    import logging
     from browser_use import BrowserProfile, BrowserSession
 
     session = BrowserSession(
         cdp_url=resolve_cdp_url(settings.cdp_url),
         browser_profile=BrowserProfile(keep_alive=True),
     )
-    yield session
+    try:
+        yield session
+    finally:
+        try:
+            await session.stop()
+        except Exception as exc:
+            logging.debug("browser_session cleanup: %s", exc)

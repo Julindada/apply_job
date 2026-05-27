@@ -117,8 +117,12 @@ async def _handle_apply_interrupt(interrupts: list) -> Command:
         typer.echo("  Type  s + Enter  to skip this job.")
         # Run blocking stdin read in a thread so the event loop stays free
         # to complete any pending async generator cleanup.
-        raw = await asyncio.to_thread(input, "  > ")
-        decision = raw.strip().lower() or "continue"
+        try:
+            raw = await asyncio.to_thread(input, "  > ")
+            decision = raw.strip().lower() or "continue"
+        except EOFError:
+            typer.echo("(EOF — skipping)")
+            decision = "s"
     return Command(resume=decision)
 
 
