@@ -7,6 +7,8 @@ services:
       - APIFY_API_TOKEN=${APIFY_API_TOKEN}
       - LLM_MODEL=${LLM_MODEL:-qwen3.6-plus}
       - APPLY_LLM_MODEL=${APPLY_LLM_MODEL:-claude-sonnet-4-6}
+      - AI233_BASE_URL=${AI233_BASE_URL}
+      - AI233_KEY=${AI233_KEY}
       - LLM_BASE_URL=${LLM_BASE_URL:-https://dashscope-us.aliyuncs.com/compatible-mode/v1}
       - CDP_URL=${CDP_URL:-http://host.docker.internal:9222}
       - DATA_DIR=${DATA_DIR:-/app/data}
@@ -24,6 +26,8 @@ services:
       - APIFY_API_TOKEN=${APIFY_API_TOKEN}
       - LLM_MODEL=${LLM_MODEL:-qwen3.6-plus}
       - APPLY_LLM_MODEL=${APPLY_LLM_MODEL:-claude-sonnet-4-6}
+      - AI233_BASE_URL=${AI233_BASE_URL}
+      - AI233_KEY=${AI233_KEY}
       - LLM_BASE_URL=${LLM_BASE_URL:-https://dashscope-us.aliyuncs.com/compatible-mode/v1}
       - CDP_URL=${CDP_URL:-http://host.docker.internal:9222}
       - DATA_DIR=${DATA_DIR:-/app/data}
