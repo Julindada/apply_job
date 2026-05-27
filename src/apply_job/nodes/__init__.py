@@ -6,7 +6,15 @@ from apply_job.nodes.llm_score import llm_score_node
 from apply_job.nodes.company_dedup import company_dedup_node
 from apply_job.nodes.review_pending_jobs import review_pending_jobs_node
 from apply_job.nodes.write_jobs_into_csv import write_jobs_into_csv_node
-from apply_job.nodes.apply_jobs import apply_jobs_node
+from apply_job.nodes.apply import (
+    load_jobs_node,
+    open_job_node,
+    wait_for_user_node,
+    analyze_form_node,
+    generate_cover_letter_node,
+    fill_and_submit_node,
+    advance_node,
+)
 
 __all__ = [
     "init_node",
@@ -17,5 +25,11 @@ __all__ = [
     "company_dedup_node",
     "review_pending_jobs_node",
     "write_jobs_into_csv_node",
-    "apply_jobs_node",
+    "load_jobs_node",
+    "open_job_node",
+    "wait_for_user_node",
+    "analyze_form_node",
+    "generate_cover_letter_node",
+    "fill_and_submit_node",
+    "advance_node",
 ]

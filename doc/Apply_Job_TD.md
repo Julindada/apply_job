@@ -144,28 +144,51 @@ Human-in-the-loop 节点。对每条 `pending` 职位，通过 `interrupt()` 暂
 ### 1. `nodes/apply_jobs.py` — 投递节点 ✅ 已实现（待测试）
 
 **文件**：`src/apply_job/nodes/apply_jobs.py`  
-**图**：`src/apply_job/apply_graph.py`（单节点图，注册为 `"apply"`）  
+**图**：`src/apply_job/apply_graph.py`（多节点图，注册为 `"apply"`）  
 **入口**：`apply-job apply`（`docker exec -it apply-job apply-job apply`）
 
-`ApplyState`（定义于同文件）：
+#### 节点流程
+
+```
+load_jobs → open_job → wait_for_user
+                             ↓ continue         ↓ skip
+                       analyze_form              |
+                      ↙ needs CL  ↘ no CL      |
+           generate_cover_letter   |             |
+                      ↓           |             |
+                 fill_and_submit ←┘             |
+                      ↓                         |
+                   advance ←────────────────────┘
+                  ↙       ↘
+             open_job     END
+```
+
+#### `ApplyState`
 
 ```python
 class ApplyState(TypedDict):
-    csv_path: str
-    resume_path: str
+    csv_path: str             # 输入
+    resume_path: str          # 输入
+    jobs: list[dict]          # load_jobs 写入
+    resume_text: str          # load_jobs 写入
+    current_job_index: int    # load_jobs 初始化，advance 递增
+    user_decision: str | None # wait_for_user 写入（"s"=skip，其他=continue）
+    needs_cover_letter: bool  # analyze_form 写入
+    required_fields: list[str]# analyze_form 写入
+    cover_letter_path: str | None  # generate_cover_letter 写入，advance 清空
 ```
 
-节点逻辑（每个职位循环一次，使用 `input()` 等待用户，无需 LangGraph interrupt）：
+#### 节点说明
 
-```
-for job in jobs:
-    1. _browser_session() → Agent 新标签打开链接
-    2. input() 等待用户填写基本信息
-    3. generate_cover_letter_pdf()
-    4. _browser_session() → Agent 填必填字段 + 上传 CL + 提交 + 开下一个链接
-```
-
-两次 browser session 分开：第一次仅导航，第二次填写提交。Chrome 保持运行，标签页在两次 session 之间保持打开。
+| 节点 | 说明 |
+|------|------|
+| `load_jobs_node` | 读取 CSV + PDF 简历，初始化 state |
+| `open_job_node` | Agent 新标签打开职位链接 |
+| `wait_for_user_node` | `interrupt()` 暂停图，等待用户填基本信息后按 Enter |
+| `analyze_form_node` | Agent 扫描表单，判断是否需要 cover letter + 列出空必填字段 |
+| `generate_cover_letter_node` | LLM 生成 cover letter PDF（仅在 needs_cover_letter=True 时执行） |
+| `fill_and_submit_node` | Agent 填剩余字段 + 上传 CL + 提交 + 新标签打开下一个链接 |
+| `advance_node` | current_job_index +1，清空 per-job state，决定循环还是结束 |
 
 CLI 参数：
 

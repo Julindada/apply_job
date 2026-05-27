@@ -58,10 +58,37 @@ def apply(
 
     resolved_csv = csv_path or os.path.join(settings.data_dir, "suitable.csv")
     resolved_resume = resume_path or settings.default_resume_path
-    asyncio.run(apply_graph.ainvoke({
-        "csv_path": resolved_csv,
-        "resume_path": resolved_resume,
-    }))
+    asyncio.run(_apply_loop(apply_graph, resolved_csv, resolved_resume))
+
+
+async def _apply_loop(graph, csv_path: str, resume_path: str) -> None:
+    thread_id = str(uuid.uuid4())
+    config = {"configurable": {"thread_id": thread_id}}
+    payload: dict | object = {"csv_path": csv_path, "resume_path": resume_path}
+
+    while True:
+        try:
+            await graph.ainvoke(payload, config)
+            typer.echo("\nAll jobs processed.")
+            return
+        except GraphInterrupt as exc:
+            payload = _handle_apply_interrupt(exc)
+
+
+def _handle_apply_interrupt(exc: GraphInterrupt) -> Command:
+    decision = "continue"
+    for iv in exc.interrupts:
+        v = iv.value
+        idx = v.get("idx", 0)
+        total = v.get("total", 0)
+        typer.echo(f"\n{'─' * 60}")
+        typer.echo(f"  [{idx + 1}/{total}] {v.get('title')} @ {v.get('company')}")
+        typer.echo(f"  {v.get('link')}")
+        typer.echo(f"{'─' * 60}")
+        typer.echo("  Fill in your basic info, then press Enter.")
+        typer.echo("  Type  s + Enter  to skip this job.")
+        decision = typer.prompt("  > ", default="").strip().lower() or "continue"
+    return Command(resume=decision)
 
 
 def _handle_interrupt(exc: GraphInterrupt) -> Command:
