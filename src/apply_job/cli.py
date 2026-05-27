@@ -6,11 +6,15 @@ Usage:
     apply-job run --country DE --resume data/resume.pdf --thread-id <id>  # resume
 """
 
+import asyncio
+import os
 import uuid
 
 import typer
 from langgraph.errors import GraphInterrupt
 from langgraph.types import Command
+
+from apply_job.config import settings
 
 app = typer.Typer(help="apply-job — LinkedIn job fetcher & filter")
 
@@ -42,6 +46,19 @@ def run(
             break
         except GraphInterrupt as exc:
             payload = _handle_interrupt(exc)
+
+
+@app.command()
+def apply(
+    csv_path: str = typer.Option(None, "--csv", "-c", help="Path to suitable jobs CSV"),
+    resume_path: str = typer.Option(None, "--resume", "-r", help="Path to resume PDF"),
+):
+    """Open job application URLs one by one and let Agent complete each form."""
+    from apply_job.apply import run_apply_loop
+
+    resolved_csv = csv_path or os.path.join(settings.data_dir, "suitable.csv")
+    resolved_resume = resume_path or settings.default_resume_path
+    asyncio.run(run_apply_loop(resolved_csv, resolved_resume))
 
 
 def _handle_interrupt(exc: GraphInterrupt) -> Command:
