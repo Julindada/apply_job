@@ -18,8 +18,8 @@ async def fill_and_submit_node(state: ApplyState) -> dict:
     resume_text = state.get("resume_text", "")
 
     task = _build_task(job, resume_text, cover_letter_path, required_fields, next_link)
-    async with browser_session() as ctx:
-        await Agent(task=task, llm=make_llm(), browser_context=ctx).run()
+    async with browser_session() as session:
+        await Agent(task=task, llm=make_llm(), browser_session=session).run()
 
     if cover_letter_path:
         try:

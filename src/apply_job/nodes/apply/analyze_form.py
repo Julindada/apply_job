@@ -21,8 +21,8 @@ async def analyze_form_node(state: ApplyState) -> dict:
     """Ask the LLM agent to inspect the current form and report what still needs filling."""
     from browser_use import Agent
 
-    async with browser_session() as ctx:
-        result = await Agent(task=_TASK, llm=make_llm(), browser_context=ctx).run()
+    async with browser_session() as session:
+        result = await Agent(task=_TASK, llm=make_llm(), browser_session=session).run()
     return _parse_output(result.final_result() or "")
 
 

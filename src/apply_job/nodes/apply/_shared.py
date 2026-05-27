@@ -16,12 +16,15 @@ def make_llm() -> ChatOpenAI:
 
 @asynccontextmanager
 async def browser_session():
-    from browser_use import Browser, BrowserConfig
+    """Yield a BrowserSession connected to the host Chrome via CDP.
 
-    browser = Browser(config=BrowserConfig(cdp_url=settings.cdp_url))
-    ctx = await browser.new_context()
-    try:
-        yield ctx
-    finally:
-        await ctx.close()
-        await browser.close()
+    keep_alive=True tells Agent.close() not to kill the browser after each
+    run, so Chrome stays open and tabs persist between node calls.
+    """
+    from browser_use import BrowserProfile, BrowserSession
+
+    session = BrowserSession(
+        cdp_url=settings.cdp_url,
+        browser_profile=BrowserProfile(keep_alive=True),
+    )
+    yield session

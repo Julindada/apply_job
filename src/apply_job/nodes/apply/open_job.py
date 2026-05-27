@@ -10,10 +10,10 @@ async def open_job_node(state: ApplyState) -> dict:
     total = len(state["jobs"])
     print(f"\n[{idx + 1}/{total}] Opening: {job.get('title')} @ {job.get('companyName')}")
 
-    async with browser_session() as ctx:
+    async with browser_session() as session:
         await Agent(
             task=f"Open a new browser tab and navigate to this URL, then stop: {job['link']}",
             llm=make_llm(),
-            browser_context=ctx,
+            browser_session=session,
         ).run()
     return {}
