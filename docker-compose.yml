@@ -12,6 +12,7 @@ services:
       - LLM_BASE_URL=${LLM_BASE_URL:-https://dashscope-us.aliyuncs.com/compatible-mode/v1}
       - CDP_URL=${CDP_URL:-http://host.docker.internal:9222}
       - DATA_DIR=${DATA_DIR:-/app/data}
+      - PYTHONPATH=/app/src
     volumes:
       - ~/docker_data:/app/data
 
@@ -33,6 +34,7 @@ services:
       - DATA_DIR=${DATA_DIR:-/app/data}
       - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
       - WATCHFILES_IGNORE_PATHS=/app/data
+      - PYTHONPATH=/app/src
     volumes:
       - ~/docker_data:/app/data
       - ./src:/app/src:ro
