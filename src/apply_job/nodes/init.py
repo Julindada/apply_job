@@ -29,7 +29,7 @@ def init_node(state: AgentState) -> dict:
     os.makedirs(data_dir, exist_ok=True)
 
     # 2. Validate required environment variables
-    missing = [var for var in ("DASHSCOPE_V2_API_KEY", "APIFY_API_TOKEN")
+    missing = [var for var in ("AI233_KEY", "APIFY_API_TOKEN")
                if not os.getenv(var)]
     if missing:
         raise EnvironmentError(

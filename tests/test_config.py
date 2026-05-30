@@ -17,3 +17,13 @@ def test_apply_model_can_be_overridden_by_env(monkeypatch):
     reloaded_config = importlib.reload(config)
 
     assert reloaded_config.settings.apply_model == "custom-apply-model"
+
+
+def test_scoring_llm_uses_ai233_env(monkeypatch):
+    monkeypatch.setenv("AI233_KEY", "ai233-key")
+    monkeypatch.setenv("AI233_BASE_URL", "https://ai233.example")
+
+    reloaded_config = importlib.reload(config)
+
+    assert reloaded_config.settings.api_key == "ai233-key"
+    assert reloaded_config.settings.llm_base_url == "https://ai233.example/v1"

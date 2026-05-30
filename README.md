@@ -61,7 +61,8 @@ cp .env.example .env
 
 ```env
 APIFY_API_TOKEN=your-apify-token
-DASHSCOPE_V2_API_KEY=your-dashscope-key
+AI233_KEY=your-ai233-key
+AI233_BASE_URL=https://ai233.net/v1
 LLM_MODEL=qwen3.6-plus        # 可选，默认 qwen3.6-plus
 ```
 
