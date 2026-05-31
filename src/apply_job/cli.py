@@ -123,8 +123,20 @@ async def _handle_apply_interrupt(interrupts: list) -> Command:
         typer.echo(f"\n{'─' * 60}")
         typer.echo(f"  [{idx + 1}/{total}] {v.get('title')} @ {v.get('company')}")
         typer.echo(f"  {v.get('link')}")
+        if v.get("reason") == "submission_blocked":
+            typer.echo("  Submission is still blocked after automated retries.")
+            if v.get("message"):
+                typer.echo(f"  Reason: {v.get('message')}")
+            fields = v.get("fields") or []
+            if fields:
+                typer.echo("  Blocking fields:")
+                for field in fields:
+                    typer.echo(f"  - {field}")
         typer.echo(f"{'─' * 60}")
-        typer.echo("  Fill in your basic info, then press Enter.")
+        if v.get("reason") == "submission_blocked":
+            typer.echo("  Fix the blocking fields, submit the application, then press Enter.")
+        else:
+            typer.echo("  Fill in your basic info, then press Enter.")
         typer.echo("  Type  s + Enter  to skip this job.")
         # Run blocking stdin read in a thread so the event loop stays free
         # to complete any pending async generator cleanup.
