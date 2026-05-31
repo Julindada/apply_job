@@ -5,6 +5,7 @@ from langgraph.graph import END
 from pypdf import PdfReader
 
 from apply_job.config import settings
+from apply_job.nodes.apply.progress import load_next_job_index
 from apply_job.nodes.apply.state import ApplyState
 from apply_job.tools.csv_ops import read_csv
 
@@ -12,14 +13,17 @@ from apply_job.tools.csv_ops import read_csv
 def load_jobs_node(state: ApplyState) -> dict:
     jobs = _load_jobs(state["csv_path"])
     resume_text = _read_resume(state["resume_path"])
+    next_job_index = load_next_job_index(state["csv_path"], len(jobs))
     if not jobs:
         logging.warning("No jobs with links found in %s", state["csv_path"])
+    elif next_job_index:
+        print(f"\nLoaded {len(jobs)} jobs. Resuming at job {next_job_index + 1}.")
     else:
         print(f"\nLoaded {len(jobs)} jobs.")
     return {
         "jobs": jobs,
         "resume_text": resume_text,
-        "current_job_index": 0,
+        "current_job_index": next_job_index,
         "user_decision": None,
         "needs_cover_letter": False,
         "required_fields": [],
@@ -28,7 +32,7 @@ def load_jobs_node(state: ApplyState) -> dict:
 
 
 def route_after_load(state: ApplyState) -> str:
-    return "open_job" if state.get("jobs") else END
+    return "open_job" if state.get("current_job_index", 0) < len(state.get("jobs", [])) else END
 
 
 def _load_jobs(csv_path: str) -> list[dict]:

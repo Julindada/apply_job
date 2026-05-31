@@ -11,6 +11,7 @@ Both files are read back as excluded_files at the start of the next run.
 import os
 
 from apply_job.config import settings
+from apply_job.nodes.apply.progress import reset_progress
 from apply_job.state import AgentState
 from apply_job.tools.csv_ops import overwriting_csv, append_write_csv
 
@@ -36,6 +37,7 @@ def write_jobs_into_csv_node(state: AgentState) -> dict:
 
     if suitable_jobs:
         path = os.path.join(data_dir, "suitable.csv")
+        reset_progress(path)
         overwriting_csv.invoke({
             "filepath": path,
             "rows": suitable_jobs,
