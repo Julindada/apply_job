@@ -16,6 +16,7 @@ from langgraph.types import Command
 from apply_job.config import settings
 
 app = typer.Typer(help="apply-job — LinkedIn job fetcher & filter")
+_DEFAULT_APPLY_THREAD_ID = "apply-default"
 
 
 @app.command()
@@ -52,11 +53,17 @@ def run(
 def apply(
     csv_path: str = typer.Option(None, "--csv", "-c", help="Path to suitable jobs CSV"),
     resume_path: str = typer.Option(None, "--resume", "-r", help="Path to resume PDF"),
+    thread_id: str = typer.Option(
+        None,
+        "--thread-id",
+        "-t",
+        help="Resume a previous apply run by thread ID",
+    ),
 ):
     """Open job application URLs one by one and let Agent complete each form."""
     resolved_csv = csv_path or os.path.join(settings.data_dir, "suitable.csv")
     resolved_resume = resume_path or settings.default_resume_path
-    asyncio.run(_apply_loop(resolved_csv, resolved_resume))
+    asyncio.run(_apply_loop(resolved_csv, resolved_resume, _resolve_apply_thread_id(thread_id)))
 
 
 def _assert_chrome_reachable() -> None:
@@ -79,7 +86,11 @@ def _assert_chrome_reachable() -> None:
         raise SystemExit(1)
 
 
-async def _apply_loop(csv_path: str, resume_path: str) -> None:
+def _resolve_apply_thread_id(thread_id: str | None) -> str:
+    return thread_id or _DEFAULT_APPLY_THREAD_ID
+
+
+async def _apply_loop(csv_path: str, resume_path: str, thread_id: str) -> None:
     from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
     from apply_job.apply_graph import build_apply_graph
@@ -89,8 +100,8 @@ async def _apply_loop(csv_path: str, resume_path: str) -> None:
     db_path = os.path.join(settings.data_dir, "apply_checkpoints.db")
     async with AsyncSqliteSaver.from_conn_string(db_path) as checkpointer:
         graph = build_apply_graph(checkpointer)
-        thread_id = str(uuid.uuid4())
         config = {"configurable": {"thread_id": thread_id}}
+        typer.echo(f"Using apply thread: {thread_id}")
         payload: dict | object = {"csv_path": csv_path, "resume_path": resume_path}
 
         while True:
