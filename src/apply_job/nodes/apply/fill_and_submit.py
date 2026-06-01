@@ -131,12 +131,19 @@ def _build_task(
         else "  - (scan the page yourself for any remaining required fields)"
     )
     next_step = (
-        f"5. Open a new browser tab and navigate to: {next_link}"
+        f"5. Only after the application is submitted successfully, open a new browser tab and navigate to: {next_link}"
         if next_link
-        else "5. This was the last job — no next URL to open."
+        else "5. Only after the application is submitted successfully, stop; this was the last job."
     )
     return f"""You are helping complete a job application form.
 The user has already filled in their basic personal information (name, email, phone, etc.).
+
+Important tab rules:
+- Do NOT click the LinkedIn apply button again.
+- Do NOT open a new application page if an application form tab is already open.
+- If the current tab is LinkedIn, switch to the existing application form tab.
+- If multiple application form tabs exist, use the one that already has uploaded files or filled fields.
+- Submit the already-filled application form before opening the next job URL.
 
 Complete these steps in order:
 
@@ -190,6 +197,12 @@ def _build_validation_recovery_task(
         else "If submission succeeds, stop; this is the last job."
     )
     return f"""A previous job application submit attempt is still blocked by validation errors.
+
+Important tab rules:
+- Do NOT click the LinkedIn apply button again.
+- Do NOT open a new application page if an application form tab is already open.
+- If the current tab is LinkedIn, switch to the existing application form tab.
+- If multiple application form tabs exist, use the one that already has uploaded files or filled fields.
 
 Recovery attempt: {attempt}/{_MAX_VALIDATION_RECOVERY_ATTEMPTS}
 

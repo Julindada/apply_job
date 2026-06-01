@@ -7,12 +7,15 @@ Called by the apply loop before the submit agent runs.
 
 import os
 import tempfile
+from pathlib import Path
 
 from fpdf import FPDF
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 
 from apply_job.config import settings
+
+_COVER_LETTER_FILENAME = "cover_letter.pdf"
 
 _PROMPT = """Write a professional cover letter for the following job application.
 
@@ -67,11 +70,7 @@ def _write_pdf(text: str, job_id: str) -> str:
     pdf.set_font("Helvetica", size=11)
     pdf.multi_cell(0, 6, safe)
 
-    tmp = tempfile.NamedTemporaryFile(
-        suffix=".pdf",
-        prefix=f"cover_letter_{job_id}_",
-        delete=False,
-    )
-    tmp.close()
-    pdf.output(tmp.name)
-    return os.path.abspath(tmp.name)
+    temp_dir = Path(tempfile.mkdtemp(prefix=f"cover_letter_{job_id}_"))
+    path = temp_dir / _COVER_LETTER_FILENAME
+    pdf.output(str(path))
+    return os.path.abspath(path)
