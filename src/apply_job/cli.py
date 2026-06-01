@@ -18,14 +18,24 @@ from apply_job.config import settings
 
 app = typer.Typer(help="apply-job — LinkedIn job fetcher & filter")
 _DEFAULT_APPLY_THREAD_ID = "apply-default"
+_APPLY_LOG_FILENAME = "apply.log"
 
 
-def _configure_apply_logging() -> None:
+def _configure_apply_logging(log_path: str | None = None) -> str:
+    resolved_log_path = log_path or os.path.join(settings.data_dir, _APPLY_LOG_FILENAME)
+    os.makedirs(os.path.dirname(resolved_log_path), exist_ok=True)
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+    file_handler = logging.FileHandler(resolved_log_path, mode="a", encoding="utf-8")
+    file_handler.setFormatter(formatter)
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        handlers=[stream_handler, file_handler],
         force=True,
     )
+    logging.getLogger(__name__).info("Apply log file: %s", resolved_log_path)
+    return resolved_log_path
 
 
 @app.command()
