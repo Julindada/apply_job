@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 @dataclass
 class Settings:
-    model: str = os.getenv("LLM_MODEL", "qwen3.6-plus")
+    model: str = os.getenv("LLM_MODEL", "gpt-5.5")
     apply_model: str = os.getenv("APPLY_LLM_MODEL", "gpt-5.4-mini")
     llm_base_url: str = os.getenv("AI233_BASE_URL", "")
     apply_base_url: str = os.getenv("AI233_BASE_URL", "")

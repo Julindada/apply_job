@@ -24,3 +24,6 @@ data/
 # IDE — personal settings
 .vscode/
 .idea/
+
+# Personal usage notes
+USAGE.md
