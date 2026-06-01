@@ -7,6 +7,7 @@ Usage:
 """
 
 import asyncio
+import logging
 import os
 import uuid
 
@@ -17,6 +18,14 @@ from apply_job.config import settings
 
 app = typer.Typer(help="apply-job — LinkedIn job fetcher & filter")
 _DEFAULT_APPLY_THREAD_ID = "apply-default"
+
+
+def _configure_apply_logging() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        force=True,
+    )
 
 
 @app.command()
@@ -61,6 +70,7 @@ def apply(
     ),
 ):
     """Open job application URLs one by one and let Agent complete each form."""
+    _configure_apply_logging()
     resolved_csv = csv_path or os.path.join(settings.data_dir, "suitable.csv")
     resolved_resume = resume_path or settings.default_resume_path
     asyncio.run(_apply_loop(resolved_csv, resolved_resume, _resolve_apply_thread_id(thread_id)))

@@ -14,6 +14,9 @@ class Settings:
     cdp_url: str = os.getenv("CDP_URL", "http://host.docker.internal:9222")
     data_dir: str = os.getenv("DATA_DIR", "/app/data")
     default_resume_path: str = os.getenv("DEFAULT_RESUME_PATH", "/app/data/resume.pdf")
+    apply_llm_timeout_seconds: float = float(
+        os.getenv("APPLY_LLM_TIMEOUT_SECONDS", "120")
+    )
     temperature: float = 0.0
     max_retries: int = 3
 

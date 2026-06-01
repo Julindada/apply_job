@@ -27,3 +27,11 @@ def test_scoring_llm_uses_ai233_env(monkeypatch):
 
     assert reloaded_config.settings.api_key == "ai233-key"
     assert reloaded_config.settings.llm_base_url == "https://ai233.example/v1"
+
+
+def test_apply_llm_timeout_can_be_overridden_by_env(monkeypatch):
+    monkeypatch.setenv("APPLY_LLM_TIMEOUT_SECONDS", "45")
+
+    reloaded_config = importlib.reload(config)
+
+    assert reloaded_config.settings.apply_llm_timeout_seconds == 45

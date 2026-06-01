@@ -1,5 +1,7 @@
+import logging
 import re
 import socket
+import time
 from contextlib import asynccontextmanager
 from typing import Any, TypeVar
 from urllib.parse import urlparse, urlunparse
@@ -9,6 +11,7 @@ from pydantic import BaseModel
 from apply_job.config import settings
 
 T = TypeVar("T", bound=BaseModel)
+logger = logging.getLogger(__name__)
 
 
 def resolve_cdp_url(cdp_url: str) -> str:
@@ -29,6 +32,15 @@ def _strip_code_block(text: str) -> str:
     """Remove ```json ... ``` or ``` ... ``` wrappers Claude sometimes adds."""
     m = re.match(r"```(?:json)?\s*\n?(.*?)\n?```$", text.strip(), re.DOTALL)
     return m.group(1).strip() if m else text.strip()
+
+
+def _output_format_name(output_format: type[BaseModel] | None) -> str:
+    return output_format.__name__ if output_format else "text"
+
+
+def _usage_total_tokens(result: Any) -> Any:
+    usage = getattr(result, "usage", None)
+    return getattr(usage, "total_tokens", None)
 
 
 class _AI233ChatOpenAI:
@@ -58,6 +70,15 @@ class _AI233ChatOpenAI:
 
         inner = self._inner
         openai_messages = OpenAIMessageSerializer.serialize_messages(messages)
+        start_time = time.monotonic()
+        format_name = _output_format_name(output_format)
+        logger.info(
+            "LLM call started model=%s output_format=%s messages=%d timeout=%s",
+            inner.model,
+            format_name,
+            len(messages),
+            settings.apply_llm_timeout_seconds,
+        )
 
         model_params: dict[str, Any] = {}
         if inner.temperature is not None:
@@ -68,7 +89,27 @@ class _AI233ChatOpenAI:
             model_params["max_completion_tokens"] = inner.max_completion_tokens
 
         if output_format is None:
-            return await inner.ainvoke(messages, output_format=None, **kwargs)
+            try:
+                result = await inner.ainvoke(messages, output_format=None, **kwargs)
+            except Exception as exc:
+                logger.exception(
+                    "LLM call failed model=%s output_format=%s duration=%.2fs error_type=%s error=%s",
+                    inner.model,
+                    format_name,
+                    time.monotonic() - start_time,
+                    type(exc).__name__,
+                    exc,
+                )
+                raise
+            logger.info(
+                "LLM call completed model=%s output_format=%s duration=%.2fs total_tokens=%s stop_reason=%s",
+                inner.model,
+                format_name,
+                time.monotonic() - start_time,
+                _usage_total_tokens(result),
+                getattr(result, "stop_reason", None),
+            )
+            return result
 
         # Append JSON instruction to the last user message.
         # AI233 Claude ignores system-message JSON constraints; user-message
@@ -99,10 +140,24 @@ class _AI233ChatOpenAI:
                 **model_params,
             )
         except Exception as e:
+            logger.exception(
+                "LLM call failed model=%s output_format=%s duration=%.2fs error_type=%s error=%s",
+                inner.model,
+                format_name,
+                time.monotonic() - start_time,
+                type(e).__name__,
+                e,
+            )
             raise ModelProviderError(message=str(e), model=inner.name) from e
 
         choice = response.choices[0] if response.choices else None
         if choice is None:
+            logger.error(
+                "LLM call failed model=%s output_format=%s duration=%.2fs error=empty_choices",
+                inner.model,
+                format_name,
+                time.monotonic() - start_time,
+            )
             raise ModelProviderError(
                 message="Empty choices in response", model=inner.name
             )
@@ -113,13 +168,31 @@ class _AI233ChatOpenAI:
         try:
             parsed = output_format.model_validate_json(content)
         except Exception as e:
+            logger.exception(
+                "LLM response parse failed model=%s output_format=%s duration=%.2fs content_prefix=%r error_type=%s error=%s",
+                inner.model,
+                format_name,
+                time.monotonic() - start_time,
+                content[:500],
+                type(e).__name__,
+                e,
+            )
             raise ModelProviderError(message=str(e), model=inner.name) from e
 
-        return ChatInvokeCompletion(
+        result = ChatInvokeCompletion(
             completion=parsed,
             usage=inner._get_usage(response),
             stop_reason=choice.finish_reason,
         )
+        logger.info(
+            "LLM call completed model=%s output_format=%s duration=%.2fs total_tokens=%s stop_reason=%s",
+            inner.model,
+            format_name,
+            time.monotonic() - start_time,
+            _usage_total_tokens(result),
+            result.stop_reason,
+        )
+        return result
 
 
 def make_llm() -> _AI233ChatOpenAI:
@@ -130,6 +203,9 @@ def make_llm() -> _AI233ChatOpenAI:
         api_key=settings.apply_api_key,
         base_url=settings.apply_base_url,
         temperature=0,
+        timeout=settings.apply_llm_timeout_seconds,
+        max_retries=settings.max_retries,
+        default_headers={"User-Agent": "apply-job/llm-debug"},
     )
     return _AI233ChatOpenAI(inner)
 
