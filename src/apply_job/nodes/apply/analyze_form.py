@@ -2,7 +2,7 @@ import json
 import logging
 import re
 
-from apply_job.nodes.apply._shared import browser_session, make_llm
+from apply_job.nodes.apply._shared import browser_session, make_agent_kwargs
 from apply_job.nodes.apply.state import ApplyState
 
 _TASK = (
@@ -22,7 +22,11 @@ async def analyze_form_node(state: ApplyState) -> dict:
     from browser_use import Agent
 
     async with browser_session() as session:
-        result = await Agent(task=_TASK, llm=make_llm(), browser_session=session).run()
+        result = await Agent(
+            task=_TASK,
+            browser_session=session,
+            **make_agent_kwargs(),
+        ).run()
     return _parse_output(result.final_result() or "")
 
 

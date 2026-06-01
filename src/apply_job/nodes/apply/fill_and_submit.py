@@ -6,7 +6,7 @@ from typing import Any
 
 from langgraph.types import interrupt
 
-from apply_job.nodes.apply._shared import browser_session, make_llm
+from apply_job.nodes.apply._shared import browser_session, make_agent_kwargs
 from apply_job.nodes.apply.state import ApplyState
 
 _MAX_VALIDATION_RECOVERY_ATTEMPTS = 2
@@ -26,7 +26,7 @@ async def fill_and_submit_node(state: ApplyState) -> dict:
 
     task = _build_task(job, resume_text, cover_letter_path, required_fields, next_link)
     async with browser_session() as session:
-        await Agent(task=task, llm=make_llm(), browser_session=session).run()
+        await Agent(task=task, browser_session=session, **make_agent_kwargs()).run()
         status = await _check_submission_status(Agent, session)
         for attempt in range(_MAX_VALIDATION_RECOVERY_ATTEMPTS):
             if not status["blocked"]:
@@ -39,7 +39,11 @@ async def fill_and_submit_node(state: ApplyState) -> dict:
                 next_link=next_link,
                 attempt=attempt + 1,
             )
-            await Agent(task=recovery_task, llm=make_llm(), browser_session=session).run()
+            await Agent(
+                task=recovery_task,
+                browser_session=session,
+                **make_agent_kwargs(),
+            ).run()
             status = await _check_submission_status(Agent, session)
 
     if status["blocked"]:
@@ -68,8 +72,8 @@ async def fill_and_submit_node(state: ApplyState) -> dict:
 async def _check_submission_status(agent_cls: type, session: Any) -> dict:
     result = await agent_cls(
         task=_SUBMISSION_STATUS_TASK,
-        llm=make_llm(),
         browser_session=session,
+        **make_agent_kwargs(),
     ).run()
     return _parse_submission_status(result.final_result() or "")
 

@@ -1,4 +1,4 @@
-from apply_job.nodes.apply._shared import browser_session, make_llm
+from apply_job.nodes.apply._shared import browser_session, make_agent_kwargs
 from apply_job.nodes.apply.state import ApplyState
 
 
@@ -13,7 +13,7 @@ async def open_job_node(state: ApplyState) -> dict:
     async with browser_session() as session:
         await Agent(
             task=f"Open a new browser tab and navigate to this URL, then stop: {job['link']}",
-            llm=make_llm(),
             browser_session=session,
+            **make_agent_kwargs(),
         ).run()
     return {}

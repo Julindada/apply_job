@@ -43,6 +43,15 @@ def _usage_total_tokens(result: Any) -> Any:
     return getattr(usage, "total_tokens", None)
 
 
+def _is_browser_use_agent_output(output_format: type[BaseModel] | None) -> bool:
+    if output_format is None:
+        return False
+    return (
+        output_format.__name__ == "AgentOutput"
+        and output_format.__module__.startswith("browser_use.agent")
+    )
+
+
 class _AI233ChatOpenAI:
     """Thin wrapper around browser_use ChatOpenAI.
 
@@ -62,7 +71,6 @@ class _AI233ChatOpenAI:
     async def ainvoke(
         self, messages: list, output_format: type[T] | None = None, **kwargs: Any
     ):
-        from browser_use.llm.openai.chat import ChatOpenAI
         from browser_use.llm.exceptions import ModelProviderError
         from browser_use.llm.schema import SchemaOptimizer
         from browser_use.llm.openai.serializer import OpenAIMessageSerializer
@@ -88,9 +96,11 @@ class _AI233ChatOpenAI:
         if inner.max_completion_tokens is not None:
             model_params["max_completion_tokens"] = inner.max_completion_tokens
 
-        if output_format is None:
+        if output_format is None or _is_browser_use_agent_output(output_format):
             try:
-                result = await inner.ainvoke(messages, output_format=None, **kwargs)
+                result = await inner.ainvoke(
+                    messages, output_format=output_format, **kwargs
+                )
             except Exception as exc:
                 logger.exception(
                     "LLM call failed model=%s output_format=%s duration=%.2fs error_type=%s error=%s",
@@ -208,6 +218,13 @@ def make_llm() -> _AI233ChatOpenAI:
         default_headers={"User-Agent": "apply-job/llm-debug"},
     )
     return _AI233ChatOpenAI(inner)
+
+
+def make_agent_kwargs() -> dict[str, Any]:
+    return {
+        "llm": make_llm(),
+        "llm_timeout": int(settings.apply_llm_timeout_seconds),
+    }
 
 
 @asynccontextmanager
