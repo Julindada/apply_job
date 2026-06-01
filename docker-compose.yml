@@ -4,7 +4,7 @@ services:
     entrypoint: ["sleep", "infinity"]
     environment:
       - APIFY_API_TOKEN=${APIFY_API_TOKEN}
-      - LLM_MODEL=${LLM_MODEL:-qwen3.6-plus}
+      - LLM_MODEL=${LLM_MODEL:-gpt-5.5}
       - APPLY_LLM_MODEL=${APPLY_LLM_MODEL:-gpt-5.4-mini}
       - AI233_BASE_URL=${AI233_BASE_URL}
       - AI233_KEY=${AI233_KEY}
@@ -22,7 +22,7 @@ services:
       - "8123:8123"
     environment:
       - APIFY_API_TOKEN=${APIFY_API_TOKEN}
-      - LLM_MODEL=${LLM_MODEL:-qwen3.6-plus}
+      - LLM_MODEL=${LLM_MODEL:-gpt-5.5}
       - APPLY_LLM_MODEL=${APPLY_LLM_MODEL:-gpt-5.4-mini}
       - AI233_BASE_URL=${AI233_BASE_URL}
       - AI233_KEY=${AI233_KEY}
